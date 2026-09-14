@@ -1,0 +1,271 @@
+/* ANTRA-WEB responsive repair: shared layout rules for every page. */
+*,*::before,*::after{box-sizing:border-box}
+/* IMPORTANT — sticky-nav fix: `overflow-x` (and therefore the paired
+   overflow-y) must NOT be set on <body>. Every page's own inline stylesheet
+   sets `body{overflow-x:hidden}`, and because the <nav class="navbar"> is a
+   direct child of <body> with no wrapping element between them, that rule
+   turns <body> itself into the nearest non-visible-overflow ancestor for
+   the nav's `position:sticky` containing-block search. The browser then
+   computes "stuck" relative to body's own box instead of the real
+   scrolling viewport, so the navbar scrolls away with the page instead of
+   sticking — this is the actual, verified cause of the reported bug, not a
+   missing `position: sticky` declaration (the nav already has one).
+   The clip/no-horizontal-scroll guarantee is kept entirely on <html>
+   (the real document scrolling element), which is safe for sticky
+   descendants; only <body>'s own overflow-x is forced back to the default
+   so it's skipped during the sticky ancestor search. The !important is
+   required because the page's own <style> block loads after this file and
+   would otherwise win the cascade on equal specificity. */
+html{max-width:100%;overflow-x:clip}
+body{max-width:100%;overflow-x:visible!important}
+img,svg,video,canvas{max-width:100%;height:auto}
+button,a,input,select,textarea{font:inherit}
+.navbar{width:min(1180px,calc(100% - 48px));margin-inline:auto;min-height:76px;display:flex;align-items:center;gap:clamp(12px,2vw,28px)}
+.nav-links{min-width:0;flex:1;display:flex;align-items:center;justify-content:center;gap:clamp(2px,1vw,14px);margin:0;padding:0}
+.nav-links a{white-space:nowrap}
+.nav-cta{white-space:nowrap}
+.mobile-menu-toggle{display:none}
+.page-block,.content-block,.hero,.section,.glass,.form-panel,.portfolio-grid,.pricing-grid,.contact-layout{min-width:0}
+.hero h1,.h-title{font-size:clamp(2.35rem,6vw,6rem);line-height:1.02;overflow-wrap:anywhere}
+.hero p,.h-sub,.body-text,p{overflow-wrap:anywhere}
+.portfolio-grid,.pricing-grid,.contact-layout,.footer-grid,.value-grid,.combo-grid,.cap-mini-grid{width:100%;min-width:0}
+.portfolio-grid,.pricing-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.contact-layout{grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr)}
+.footer-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.price-card,.port-card,.combo-card,.cap-card,.form-panel{min-width:0}
+.price-card p,.price-card li,.port-card p,.port-card h3{overflow-wrap:anywhere}
+.hero-video{min-width:0;overflow:hidden}
+.hero-video video{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover}
+.hero-sound-btn{width:auto!important;min-width:38px!important;height:38px!important;padding:8px 11px!important;display:inline-flex!important;align-items:center;justify-content:center;gap:6px;font-size:10px!important}
+.hero-sound-btn svg{width:16px;height:16px;flex:0 0 16px}
+.form-panel input,.form-panel select,.form-panel textarea{width:100%;max-width:100%;min-width:0}
+.form-panel textarea{resize:vertical}
+.portfolio-grid img,.port-card img,.mockup,.browser-frame{max-width:100%;height:auto}
+.modal,.modal-content,[role=dialog]{max-width:calc(100vw - 24px)}
+
+@media (max-width:1100px) and (min-width:721px){
+  .navbar{width:min(100% - 36px,1020px);gap:12px}
+  .nav-links{gap:0}.nav-links a{font-size:10px;padding-inline:4px}
+  .nav-cta{font-size:10px;padding-inline:12px}
+  .pricing-grid,.portfolio-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* Sticky-nav fix, part 2: these mobile/tablet blocks previously re-declared
+   `.navbar{position:relative}` to give the bar a normal containing block
+   for the absolutely-positioned dropdown menu. That's a direct conflict
+   with the sticky positioning the base stylesheet sets — position:relative
+   is not sticky, so the bar scrolled away with the page on every width
+   this query covers (this is exactly the range across the reported test
+   sizes: 320/375/390/412 and up through 1100px). Re-declared explicitly as
+   sticky (with !important, since this rule must not depend on file load
+   order to win) — the dropdown menu still opens correctly because a
+   sticky-positioned element establishes a containing block for its
+   absolutely-positioned children exactly like a relatively-positioned one
+   does. */
+@media (max-width:720px){
+  .navbar{width:calc(100% - 32px);min-height:64px;position:sticky!important;top:0!important;flex-wrap:nowrap}
+  .navbar .logo{flex:1;min-width:0}
+  .nav-cta{display:none}
+  .mobile-menu-toggle{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;padding:0;border:1px solid rgba(79,227,255,.3);border-radius:8px;background:rgba(7,19,28,.85);color:#4fe3ff;cursor:pointer}
+  .mobile-menu-toggle span,.mobile-menu-toggle span::before,.mobile-menu-toggle span::after{display:block;width:18px;height:2px;background:currentColor;content:"";transition:transform .2s}
+  .mobile-menu-toggle span::before{transform:translateY(-6px)}.mobile-menu-toggle span::after{transform:translateY(4px)}
+  .mobile-menu-toggle[aria-expanded=true] span{background:transparent}.mobile-menu-toggle[aria-expanded=true] span::before{transform:rotate(45deg)}.mobile-menu-toggle[aria-expanded=true] span::after{transform:rotate(-45deg)}
+  /* !important wins over the page's legacy inline desktop nav declaration. */
+  .nav-links{display:none!important;position:absolute;z-index:30;top:calc(100% + 8px);left:0;right:0;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:2px;padding:10px;border:1px solid rgba(79,227,255,.25);border-radius:12px;background:rgba(7,19,28,.98);box-shadow:0 18px 50px rgba(0,0,0,.45);max-height:min(70vh,520px);overflow-y:auto}
+  .nav-links.is-open{display:flex!important}
+  .nav-links li{width:100%;list-style:none}.nav-links a{display:block;width:100%;padding:13px 14px;font-size:11px;white-space:normal}
+  .hero{padding-top:clamp(42px,10vw,72px)!important;padding-bottom:clamp(40px,9vw,64px)!important;min-height:0!important}
+  .hero-video{margin-top:20px}.hero-video video{aspect-ratio:16/9;object-fit:cover;background:#050b10}
+  .hero-sound-btn{position:relative!important;right:auto!important;bottom:auto!important;margin-top:10px}
+  .content-block,.section{padding-inline:0!important}
+  .portfolio-grid,.pricing-grid,.contact-layout,.combo-grid,.cap-mini-grid,.value-grid{grid-template-columns:1fr!important}
+  .footer-grid{grid-template-columns:1fr 1fr;gap:24px}
+  .price-card,.port-card,.combo-card,.form-panel{padding:22px!important}
+  .modal,.modal-content,[role=dialog]{width:calc(100vw - 24px)!important;margin:12px auto!important;max-height:calc(100vh - 24px);overflow-y:auto}
+  .orbit-svg,.service-orbit{max-width:100%;transform:none!important}
+}
+@media (max-width:420px){
+  .navbar{width:calc(100% - 24px)}.footer-grid{grid-template-columns:1fr}
+  .hero h1,.h-title{font-size:clamp(2.1rem,11vw,3rem)}
+  .hero-actions{flex-direction:column;align-items:stretch}.hero-actions a,.hero-actions button{width:100%;text-align:center}
+  .hero-sound-btn{align-self:flex-start}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Homepage-only composition: show the supplied hero media before the copy
+   on phones and tablets, without changing the desktop presentation. */
+@media (max-width:1100px){
+  #home section.hero{display:flex;flex-direction:column}
+  #home section.hero > .home-hero-wrap{order:1}
+  #home section.hero > .eyebrow{order:2}
+  #home section.hero > .h-title{order:3}
+  #home section.hero > .h-sub{order:4}
+  #home section.hero > .btn-row{order:5}
+  #home section.hero > .motion-strip{order:6}
+  #home .home-hero-wrap{margin-top:0}
+  #home .laptop-stage{aspect-ratio:16/8.8}
+  #home .hero-video{object-fit:cover;background:#04070c}
+  #home .hero-copy-panel{position:static;max-width:none;padding:14px 18px 16px;background:linear-gradient(180deg,rgba(4,7,12,.15),rgba(4,7,12,.92))}
+}
+@media (max-width:720px){
+  #home section.hero{padding-top:24px!important;padding-bottom:42px!important}
+  #home .home-hero-wrap{border-radius:16px}
+  #home .laptop-stage{aspect-ratio:16/9;min-height:0}
+  #home .hero-video{object-fit:cover}
+  #home .hero-sound-btn{position:absolute!important;right:10px;bottom:10px;margin:0;width:36px!important;min-width:36px!important;height:36px!important;padding:8px!important;border-radius:50%;gap:0;background:rgba(4,7,12,.7)}
+  #home .hero-sound-btn #heroSoundLabel{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  #home .hero-sound-btn svg{width:15px;height:15px;flex-basis:15px}
+  #home .hero-copy-panel{padding:12px 14px 14px}
+  #home .caption-txt{font-size:11px;line-height:1.5}
+  #home section.hero > .h-title{font-size:clamp(2rem,9.5vw,3.2rem);margin-top:12px}
+  #home section.hero > .h-sub{font-size:14px;line-height:1.6;margin-top:14px}
+  #home section.hero > .btn-row{margin-top:20px}
+  #home section.hero > .motion-strip{margin-top:22px}
+}
+@media (max-width:380px){
+  #home .laptop-stage{aspect-ratio:16/9.5}
+  #home section.hero > .h-sub{font-size:13px}
+}
+
+/* Final visual polish for constrained screens. The media gets the visual
+   priority; the surrounding UI becomes denser rather than merely smaller. */
+@media (max-width:1100px){
+  #home .home-hero-wrap{
+    box-shadow:0 0 0 1px rgba(79,227,255,.08),0 24px 70px rgba(0,0,0,.35),0 0 55px rgba(79,227,255,.08);
+  }
+  #home .laptop-stage{
+    aspect-ratio:16/9;
+    background:
+      linear-gradient(135deg,rgba(79,227,255,.12),transparent 22%,transparent 78%,rgba(90,141,255,.14)),
+      #04070c;
+  }
+  #home .hero-video{object-fit:cover!important;filter:brightness(.92) contrast(1.08) saturate(1.08)}
+  #home .stage-vignette{background:linear-gradient(180deg,rgba(4,7,12,.05),transparent 52%,rgba(4,7,12,.42))}
+  #home .hero-copy-panel{border-top:1px solid rgba(79,227,255,.15)}
+}
+@media (max-width:720px){
+  body{background:radial-gradient(circle at 50% 0,rgba(21,61,81,.28),transparent 33%),var(--bg-void,#05070c)}
+  .page-tag{padding:16px 16px 0!important;gap:9px;font-size:9px!important;letter-spacing:2px!important}
+  #home section.hero{padding:18px 16px 34px!important}
+  #home .home-hero-wrap{margin-inline:-4px;border-radius:14px}
+  #home .laptop-stage{aspect-ratio:16/9;min-height:0}
+  #home .hero-video{object-position:center center}
+  #home .hero-sound-btn{right:9px;bottom:9px;width:34px!important;min-width:34px!important;height:34px!important;border-color:rgba(255,255,255,.28);box-shadow:0 4px 16px rgba(0,0,0,.35)}
+  #home .hero-copy-panel{padding:11px 13px 13px}
+  #home .caption-tag{font-size:9px;letter-spacing:1.6px}
+  #home section.hero > .eyebrow{margin:22px 0 0;font-size:9px;letter-spacing:1.8px}
+  #home section.hero > .h-title{letter-spacing:-.8px;line-height:1.02;margin-top:10px}
+  #home section.hero > .btn-row{gap:9px}
+  #home section.hero > .btn-row .btn{padding:13px 16px;font-size:10px}
+  #home section.hero > .motion-strip{padding:10px 11px;gap:5px;margin-top:18px;font-size:8px;letter-spacing:.7px}
+  #home .motion-strip .step{padding:5px 6px}
+  .section-head{padding-inline:16px!important;margin-bottom:24px!important;gap:16px}
+  .section-head .btn{padding:11px 13px;font-size:9px}
+  .content-block{padding:48px 16px!important}
+  .content-block.tight{padding-top:0!important}
+  .glass{border-radius:13px}
+  .card,.price-card,.port-card,.combo-card,.form-panel{padding:18px!important}
+  .cap-lead{padding:22px!important}
+  .cap-lead .big-num{font-size:48px}
+  .cap-mini-grid{gap:10px}
+  .cap-card{padding:17px!important}
+  .cap-card .ic{margin-bottom:10px}
+  .proj-showcase{gap:12px}
+  .proj-main{min-height:330px;padding:20px!important}
+  .proj-mini{padding:16px!important}
+  .why-item{gap:12px;padding-block:12px}
+  .accordion-list{gap:10px}
+  .acc-head{padding:16px!important;gap:12px}
+  .acc-head h4{font-size:14px;line-height:1.35}
+  /* Mobile footer: was a single flat stack of every link/line with no
+     visual grouping (correct info, no hierarchy). Group the three existing
+     blocks (brand, SITE, GET IN TOUCH) with a divider + breathing room
+     between each instead of adding any new content, and give the bottom
+     row its own separated line. Content and order are unchanged — only
+     composition. Extra bottom padding on <footer> also keeps the fixed
+     WhatsApp button (bottom-left, ~52-58px tall) from sitting on top of
+     the copyright line once the page is scrolled to the very end. */
+  footer{padding:46px 16px 108px!important}
+  .footer-grid{grid-template-columns:1fr!important;gap:0!important;padding-bottom:28px!important}
+  .footer-grid.simple>div{padding:20px 0;border-top:1px solid var(--line)}
+  .footer-grid.simple>div:first-child{border-top:0;padding-top:0}
+  .footer-grid .social-row{margin-top:16px}
+  .footer-bottom{flex-direction:column;align-items:flex-start;gap:6px;font-size:9px;line-height:1.5;margin-top:20px}
+  section.hero{padding-inline:16px!important}
+  .services-fallback-grid .p{padding:18px!important}
+  .combo-card{gap:7px!important}
+  .wa-float{width:48px!important;height:48px!important;left:14px!important;bottom:14px!important}
+  .wa-float svg{width:23px!important;height:23px!important}
+}
+@media (max-width:420px){
+  #home .home-hero-wrap{margin-inline:0}
+  #home section.hero > .eyebrow{margin-top:18px}
+  .section-head{align-items:flex-start}
+  .section-head .btn{margin-top:4px}
+  .footer-grid{grid-template-columns:1fr!important}
+  #home .mini-teaser{display:grid!important;grid-template-columns:1fr!important;gap:12px!important;padding:19px!important}
+  #home .mini-teaser h3{font-size:18px;line-height:1.15}
+  #home .mini-teaser p{font-size:12.5px;line-height:1.55}
+  #home .mini-teaser .btn{justify-self:start;width:auto}
+}
+
+@media (min-width:721px) and (max-width:1100px){
+  .navbar{width:calc(100% - 36px);min-height:68px;padding:12px 0!important;position:sticky!important;top:0!important;flex-wrap:nowrap}
+  .navbar .logo{flex:1;min-width:0}
+  .nav-cta{display:none!important}
+  .mobile-menu-toggle{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;padding:0;border:1px solid rgba(79,227,255,.3);border-radius:8px;background:rgba(7,19,28,.85);color:#4fe3ff;cursor:pointer}
+  .mobile-menu-toggle span,.mobile-menu-toggle span::before,.mobile-menu-toggle span::after{display:block;width:18px;height:2px;background:currentColor;content:"";transition:transform .2s}
+  .mobile-menu-toggle span::before{transform:translateY(-6px)}.mobile-menu-toggle span::after{transform:translateY(4px)}
+  .mobile-menu-toggle[aria-expanded=true] span{background:transparent}.mobile-menu-toggle[aria-expanded=true] span::before{transform:rotate(45deg)}.mobile-menu-toggle[aria-expanded=true] span::after{transform:rotate(-45deg)}
+  .nav-links{display:none!important;position:absolute;z-index:30;top:calc(100% + 8px);left:0;right:0;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:2px;padding:10px;border:1px solid rgba(79,227,255,.25);border-radius:12px;background:rgba(7,19,28,.98);box-shadow:0 18px 50px rgba(0,0,0,.45);max-height:min(70vh,520px);overflow-y:auto}
+  .nav-links.is-open{display:flex!important}
+  .nav-links li{width:100%;list-style:none}.nav-links a{display:block;width:100%;padding:13px 14px;font-size:11px;white-space:normal}
+  #home .hero-sound-btn{width:36px!important;min-width:36px!important;height:36px!important;padding:8px!important;border-radius:50%;gap:0}
+  #home .hero-sound-btn #heroSoundLabel{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  #home .hero-sound-btn svg{width:15px;height:15px;flex-basis:15px}
+}
+
+/* The homepage title is intended to read as solid white; the legacy
+   gradient treatment can lose contrast on the lower half at some widths. */
+#home h1.h-title{
+  color:var(--white)!important;
+  -webkit-text-fill-color:var(--white)!important;
+  background:none!important;
+}
+
+/* FAQ accordion: the open state used a fixed max-height (200px) that is too
+   short once an answer wraps across more lines at narrower widths, clipping
+   the last line of longer answers. A generously large cap still animates
+   correctly (it just stops growing once it reaches the real content height)
+   and guarantees nothing gets cut off at any breakpoint. */
+.acc-item.open .acc-body{max-height:720px!important}
+
+/* About page "panel-mosaic": the desktop layout uses grid-column:span 2/3
+   across 5 explicit columns on purpose. At <=900px the component switches
+   to a 2-column grid, but the leftover span values (span 3 in a 2-col grid)
+   overflow into an implicit extra column and can push the page into
+   horizontal scroll. Neutralise the spans only at the breakpoint where the
+   column count actually changes, and simplify to one column on phones so
+   the four short panels don't turn into a cramped 2-up grid. */
+@media (max-width:900px){
+  .panel-mosaic .p{grid-column:auto!important}
+}
+@media (max-width:560px){
+  .panel-mosaic{grid-template-columns:1fr!important}
+}
+
+/* Case Studies: reduce content density by breakpoint per the site's
+   responsive-content-density rule, without deleting any copy. The hero
+   sub-headline is split (in the page markup) into a core sentence plus two
+   supporting spans; the per-project lede and the CONTEXT/CHALLENGE/
+   DIRECTION/ROLE meta text are visually clamped rather than rewritten, so
+   the full detail stays available on tablet/desktop and in the DOM. */
+@media (max-width:768px){
+  #case-studies .h-sub .hs-tail{display:none}
+  #case-studies .case-lede{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+}
+@media (max-width:480px){
+  #case-studies .h-sub .hs-mid{display:none}
+  #case-studies .case-lede{-webkit-line-clamp:2}
+  #case-studies .case-meta-grid p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+}
