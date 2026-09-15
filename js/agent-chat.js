@@ -10,10 +10,13 @@
    - No simulated/fake replies
    - Browser sends text/plain to avoid CORS preflight
    - Worker forwards the JSON to n8n as application/json
+   - n8n streaming responses:
+       begin → item → item → end
    ========================================================= */
 
 (function () {
   'use strict';
+
 
   /* =========================================================
      SESSION ID
@@ -65,7 +68,7 @@
 
 
   /* =========================================================
-     RESPONSE EXTRACTION
+     NORMAL RESPONSE EXTRACTION
      ========================================================= */
 
   function extractReply(data) {
@@ -134,6 +137,256 @@
 
 
   /* =========================================================
+     PARSE n8n STREAMING RESPONSE
+     ---------------------------------------------------------
+     n8n streaming format is:
+
+     {"type":"begin", ...}
+     {"type":"item","content":"Hello", ...}
+     {"type":"item","content":" world", ...}
+     {"type":"end", ...}
+
+     IMPORTANT:
+     - Ignore begin
+     - Collect item.content
+     - Ignore end
+     - Surface error events
+     ========================================================= */
+
+  function parseStreamingResponse(text) {
+
+    var raw =
+      String(text || '').trim();
+
+    if (!raw) {
+      return {
+        reply: null,
+        error: null
+      };
+    }
+
+
+    var lines =
+      raw
+        .split(/\r?\n/)
+        .map(function (line) {
+          return line.trim();
+        })
+        .filter(Boolean);
+
+
+    var items = [];
+    var streamError = null;
+
+
+    /* =======================================================
+       PARSE EACH JSONL / SSE LINE
+       ======================================================= */
+
+    for (
+      var i = 0;
+      i < lines.length;
+      i++
+    ) {
+
+      var line =
+        lines[i];
+
+
+      /*
+       * Support SSE-style:
+       *
+       * data: {...}
+       */
+      if (
+        line.indexOf('data:') === 0
+      ) {
+        line =
+          line
+            .slice(5)
+            .trim();
+      }
+
+
+      /*
+       * Ignore SSE comments / keepalive lines.
+       */
+      if (
+        !line ||
+        line.indexOf(':') === 0
+      ) {
+        continue;
+      }
+
+
+      var parsed = null;
+
+      try {
+
+        parsed =
+          JSON.parse(line);
+
+      } catch (error) {
+
+        /*
+         * This may be a normal text response rather
+         * than a streaming JSON response.
+         *
+         * Do not fail immediately.
+         */
+        continue;
+      }
+
+
+      if (
+        !parsed ||
+        typeof parsed !== 'object'
+      ) {
+        continue;
+      }
+
+
+      items.push(parsed);
+
+
+      /* =====================================================
+         ERROR EVENT
+         ===================================================== */
+
+      if (
+        parsed.type === 'error'
+      ) {
+
+        if (
+          typeof parsed.message === 'string'
+        ) {
+          streamError =
+            parsed.message;
+
+        } else if (
+          typeof parsed.content === 'string'
+        ) {
+          streamError =
+            parsed.content;
+
+        } else {
+          streamError =
+            'The live AI agent returned an error.';
+        }
+      }
+    }
+
+
+    /* =======================================================
+       COLLECT n8n ITEM CONTENT
+       ======================================================= */
+
+    var replyParts = [];
+
+
+    for (
+      var j = 0;
+      j < items.length;
+      j++
+    ) {
+
+      var event =
+        items[j];
+
+
+      /*
+       * THIS IS THE IMPORTANT PART.
+       *
+       * begin = ignored
+       * item  = actual response content
+       * end   = ignored
+       */
+      if (
+        event.type === 'item'
+      ) {
+
+        if (
+          typeof event.content === 'string'
+        ) {
+
+          replyParts.push(
+            event.content
+          );
+
+        } else if (
+          event.content &&
+          typeof event.content === 'object'
+        ) {
+
+          if (
+            typeof event.content.text === 'string'
+          ) {
+
+            replyParts.push(
+              event.content.text
+            );
+
+          } else if (
+            typeof event.content.content === 'string'
+          ) {
+
+            replyParts.push(
+              event.content.content
+            );
+          }
+        }
+      }
+    }
+
+
+    var streamedReply =
+      replyParts.join('');
+
+
+    if (
+      streamedReply.trim()
+    ) {
+
+      return {
+        reply: streamedReply,
+        error: streamError
+      };
+    }
+
+
+    /*
+     * If there were stream events but no item content,
+     * don't accidentally return "begin".
+     */
+    if (
+      items.some(function (item) {
+        return (
+          item &&
+          (
+            item.type === 'begin' ||
+            item.type === 'end'
+          )
+        );
+      })
+    ) {
+
+      return {
+        reply: null,
+        error:
+          streamError ||
+          'The AI stream completed without message content.'
+      };
+    }
+
+
+    return {
+      reply: null,
+      error: streamError
+    };
+  }
+
+
+  /* =========================================================
      INITIALIZE ONE CHAT PANEL
      ========================================================= */
 
@@ -146,12 +399,14 @@
     var webhook =
       panel.getAttribute('data-webhook');
 
+
     /*
      * Real Cloudflare Worker endpoint.
      * Used by embedded browser chat.
      */
     var fetchTarget =
       panel.getAttribute('data-proxy');
+
 
     var agentName =
       panel.getAttribute('data-agent-name') ||
@@ -166,25 +421,42 @@
       'antra-chat-session-' +
       agentName.toLowerCase();
 
+
     var body =
-      panel.querySelector('[data-chat-body]');
+      panel.querySelector(
+        '[data-chat-body]'
+      );
+
 
     var form =
-      panel.querySelector('[data-chat-form]');
+      panel.querySelector(
+        '[data-chat-form]'
+      );
+
 
     var textarea =
-      panel.querySelector('[data-chat-input]');
+      panel.querySelector(
+        '[data-chat-input]'
+      );
+
 
     var sendBtn =
-      panel.querySelector('[data-chat-send]');
+      panel.querySelector(
+        '[data-chat-send]'
+      );
+
 
     var emptyState =
-      panel.querySelector('[data-chat-empty]');
+      panel.querySelector(
+        '[data-chat-empty]'
+      );
+
 
     var openLiveBtns =
       panel.querySelectorAll(
         '[data-chat-open-live]'
       );
+
 
     var chips =
       panel.querySelectorAll(
@@ -203,6 +475,7 @@
       !form ||
       !textarea
     ) {
+
       console.error(
         '[' +
         agentName +
@@ -227,13 +500,17 @@
     var sessionId;
 
     try {
+
       sessionId =
         window.sessionStorage.getItem(
           storageKey
         );
 
+
       if (!sessionId) {
-        sessionId = uid();
+
+        sessionId =
+          uid();
 
         window.sessionStorage.setItem(
           storageKey,
@@ -242,7 +519,9 @@
       }
 
     } catch (e) {
-      sessionId = uid();
+
+      sessionId =
+        uid();
 
       console.warn(
         '[' +
@@ -264,6 +543,7 @@
        ======================================================= */
 
     function openLive() {
+
       window.open(
         webhook,
         '_blank',
@@ -271,11 +551,13 @@
       );
     }
 
+
     for (
       var i = 0;
       i < openLiveBtns.length;
       i++
     ) {
+
       openLiveBtns[i].addEventListener(
         'click',
         openLive
@@ -288,6 +570,7 @@
        ======================================================= */
 
     function scrollToEnd() {
+
       body.scrollTop =
         body.scrollHeight;
     }
@@ -298,7 +581,9 @@
        ======================================================= */
 
     function hideEmpty() {
+
       if (emptyState) {
+
         emptyState.style.display =
           'none';
       }
@@ -309,44 +594,80 @@
        ADD MESSAGE
        ======================================================= */
 
-    function addMessage(role, html) {
+    function addMessage(
+      role,
+      html
+    ) {
 
       var row =
-        document.createElement('div');
+        document.createElement(
+          'div'
+        );
+
 
       row.className =
-        'msg msg-' + role;
+        'msg msg-' +
+        role;
 
-      if (role === 'agent') {
+
+      /*
+       * Agent avatar.
+       */
+      if (
+        role === 'agent'
+      ) {
 
         var avatar =
-          document.createElement('div');
+          document.createElement(
+            'div'
+          );
+
 
         avatar.className =
           'msg-avatar-mini';
+
 
         avatar.textContent =
           agentName
             .charAt(0)
             .toUpperCase();
 
-        row.appendChild(avatar);
+
+        row.appendChild(
+          avatar
+        );
       }
 
+
+      /*
+       * Message bubble.
+       */
       var bubble =
-        document.createElement('div');
+        document.createElement(
+          'div'
+        );
+
 
       bubble.className =
         'msg-bubble';
 
+
       bubble.innerHTML =
         html;
 
-      row.appendChild(bubble);
 
-      body.appendChild(row);
+      row.appendChild(
+        bubble
+      );
+
+
+      body.appendChild(
+        row
+      );
+
 
       scrollToEnd();
+
 
       return row;
     }
@@ -359,40 +680,64 @@
     function addTyping() {
 
       var row =
-        document.createElement('div');
+        document.createElement(
+          'div'
+        );
+
 
       row.className =
         'msg msg-agent msg-typing';
 
+
       var avatar =
-        document.createElement('div');
+        document.createElement(
+          'div'
+        );
+
 
       avatar.className =
         'msg-avatar-mini';
+
 
       avatar.textContent =
         agentName
           .charAt(0)
           .toUpperCase();
 
-      row.appendChild(avatar);
+
+      row.appendChild(
+        avatar
+      );
+
 
       var bubble =
-        document.createElement('div');
+        document.createElement(
+          'div'
+        );
+
 
       bubble.className =
         'msg-bubble typing-indicator';
+
 
       bubble.innerHTML =
         '<span></span>' +
         '<span></span>' +
         '<span></span>';
 
-      row.appendChild(bubble);
 
-      body.appendChild(row);
+      row.appendChild(
+        bubble
+      );
+
+
+      body.appendChild(
+        row
+      );
+
 
       scrollToEnd();
+
 
       return row;
     }
@@ -402,17 +747,24 @@
        BUSY STATE
        ======================================================= */
 
-    function setBusy(state) {
+    function setBusy(
+      state
+    ) {
 
-      busy = state;
+      busy =
+        state;
+
 
       textarea.disabled =
         state;
 
+
       if (sendBtn) {
+
         sendBtn.disabled =
           state;
       }
+
 
       panel.classList.toggle(
         'is-busy',
@@ -430,12 +782,14 @@
       textarea.style.height =
         'auto';
 
+
       textarea.style.height =
         Math.min(
           textarea.scrollHeight,
           140
         ) + 'px';
     }
+
 
     textarea.addEventListener(
       'input',
@@ -453,6 +807,7 @@
     ) {
 
       addMessage(
+
         'system',
 
         'Couldn’t reach the live ' +
@@ -480,13 +835,18 @@
         '</div>'
       );
 
+
       console.error(
         '[' +
         agentName +
         ' chat] Live connection failed.',
         {
-          proxy: fetchTarget,
-          error: errorDetails || null
+          proxy:
+            fetchTarget,
+
+          error:
+            errorDetails ||
+            null
         }
       );
 
@@ -500,15 +860,19 @@
           '[data-chat-retry]'
         );
 
+
       var retry =
         retryButtons[
           retryButtons.length - 1
         ];
 
+
       if (retry) {
+
         retry.addEventListener(
           'click',
           function () {
+
             sendMessage(
               originalText
             );
@@ -526,12 +890,15 @@
           '[data-chat-open-live]'
         );
 
+
       var openButton =
         openButtons[
           openButtons.length - 1
         ];
 
+
       if (openButton) {
+
         openButton.addEventListener(
           'click',
           openLive
@@ -544,15 +911,24 @@
        SEND MESSAGE
        ======================================================= */
 
-    async function sendMessage(rawText) {
+    async function sendMessage(
+      rawText
+    ) {
 
       var text =
-        (rawText || '').trim();
+        (rawText || '')
+          .trim();
 
+
+      /*
+       * Do nothing for empty messages
+       * or while another request is running.
+       */
       if (
         !text ||
         busy
       ) {
+
         return;
       }
 
@@ -563,16 +939,24 @@
 
       hideEmpty();
 
+
       addMessage(
         'user',
         renderText(text)
       );
 
-      textarea.value = '';
+
+      textarea.value =
+        '';
+
 
       autoGrow();
 
-      setBusy(true);
+
+      setBusy(
+        true
+      );
+
 
       var typingRow =
         addTyping();
@@ -584,9 +968,15 @@
 
       var payload =
         JSON.stringify({
-          action: 'sendMessage',
-          sessionId: sessionId,
-          chatInput: text
+
+          action:
+            'sendMessage',
+
+          sessionId:
+            sessionId,
+
+          chatInput:
+            text
         });
 
 
@@ -604,7 +994,7 @@
            Browser sends text/plain intentionally.
            This avoids a CORS preflight request.
 
-           Worker receives the raw JSON text and forwards
+           Worker receives raw JSON text and forwards
            it to n8n as application/json.
            =================================================== */
 
@@ -612,9 +1002,11 @@
           await fetch(
             fetchTarget,
             {
-              method: 'POST',
+              method:
+                'POST',
 
               headers: {
+
                 'Content-Type':
                   'text/plain;charset=UTF-8',
 
@@ -638,25 +1030,40 @@
            HTTP ERROR
            =================================================== */
 
-        if (!response.ok) {
+        if (
+          !response.ok
+        ) {
 
-          var errorBody = '';
+          var errorBody =
+            '';
+
 
           try {
+
             errorBody =
               await response.text();
-          } catch (readError) {
+
+          } catch (
+            readError
+          ) {
+
             errorBody =
               '';
           }
 
+
           throw new Error(
+
             'HTTP ' +
             response.status +
+
             (
               errorBody
                 ? ' — ' +
-                  errorBody.slice(0, 500)
+                  errorBody.slice(
+                    0,
+                    500
+                  )
                 : ''
             )
           );
@@ -664,7 +1071,10 @@
 
 
         /* ===================================================
-           READ RESPONSE — FIXED
+           READ RESPONSE AS TEXT
+           ---------------------------------------------------
+           NEVER call response.json() here.
+           n8n streaming can return multiple JSON objects.
            =================================================== */
 
         var contentType =
@@ -672,182 +1082,88 @@
             'content-type'
           ) || '';
 
-        /*
-         * IMPORTANT:
-         * Do NOT use response.json() here.
-         *
-         * The browser console showed:
-         *
-         * SyntaxError:
-         * Unexpected whitespace character
-         * after JSON
-         *
-         * So we read the response as text first.
-         */
+
         var responseText =
           await response.text();
 
+
         var data =
-          responseText;
+          null;
+
+
+        var reply =
+          null;
 
 
         /* ===================================================
-           PARSE JSON SAFELY
+           FIRST:
+           Try to detect n8n streaming chunks.
+           =================================================== */
+
+        var streamResult =
+          parseStreamingResponse(
+            responseText
+          );
+
+
+        if (
+          streamResult.reply
+        ) {
+
+          reply =
+            streamResult.reply;
+
+        }
+
+
+        /* ===================================================
+           STREAM ERROR
            =================================================== */
 
         if (
-          contentType
-            .toLowerCase()
-            .indexOf(
-              'application/json'
-            ) !== -1
+          !reply &&
+          streamResult.error
+        ) {
+
+          throw new Error(
+            streamResult.error
+          );
+        }
+
+
+        /* ===================================================
+           NORMAL JSON RESPONSE
+           ---------------------------------------------------
+           Used if this is NOT a streaming response.
+           =================================================== */
+
+        if (
+          !reply
         ) {
 
           try {
 
-            /*
-             * Normal JSON response.
-             */
             data =
               JSON.parse(
                 responseText
               );
 
-          } catch (jsonError) {
+          } catch (
+            jsonError
+          ) {
 
             /*
-             * Some n8n configurations can return
-             * multiple JSON objects separated by
-             * whitespace/newlines.
+             * The response may simply be plain text.
              */
-            var lines =
-              responseText
-                .split(/\r?\n/)
-                .map(
-                  function (line) {
-                    return line.trim();
-                  }
-                )
-                .filter(Boolean);
-
-            var parsedItems = [];
-
-
-            /* ===============================================
-               PARSE EACH JSON LINE
-               =============================================== */
-
-            for (
-              var li = 0;
-              li < lines.length;
-              li++
-            ) {
-
-              var candidate =
-                lines[li];
-
-
-              /*
-               * Support SSE-style:
-               *
-               * data: {...}
-               */
-              if (
-                candidate.indexOf(
-                  'data:'
-                ) === 0
-              ) {
-
-                candidate =
-                  candidate
-                    .slice(5)
-                    .trim();
-              }
-
-
-              try {
-
-                parsedItems.push(
-                  JSON.parse(
-                    candidate
-                  )
-                );
-
-              } catch (lineError) {
-
-                /*
-                 * Ignore non-JSON lines.
-                 */
-              }
-            }
-
-
-            /* ===============================================
-               ONE VALID JSON OBJECT
-               =============================================== */
-
-            if (
-              parsedItems.length === 1
-            ) {
-
-              data =
-                parsedItems[0];
-
-            }
-
-
-            /* ===============================================
-               MULTIPLE VALID JSON OBJECTS
-               =============================================== */
-
-            else if (
-              parsedItems.length > 1
-            ) {
-
-              var foundReply =
-                false;
-
-
-              /*
-               * Look for the object that actually
-               * contains the agent response.
-               */
-              for (
-                var pi = 0;
-                pi < parsedItems.length;
-                pi++
-              ) {
-
-                if (
-                  extractReply(
-                    parsedItems[pi]
-                  )
-                ) {
-
-                  data =
-                    parsedItems[pi];
-
-                  foundReply =
-                    true;
-
-                  break;
-                }
-              }
-
-
-              /*
-               * If none contains a recognized reply,
-               * use the final parsed object.
-               */
-              if (!foundReply) {
-
-                data =
-                  parsedItems[
-                    parsedItems.length - 1
-                  ];
-              }
-            }
+            data =
+              responseText;
           }
+
+
+          reply =
+            extractReply(
+              data
+            );
         }
 
 
@@ -859,49 +1175,56 @@
           typingRow &&
           typingRow.parentNode
         ) {
+
           typingRow.remove();
         }
 
 
         /* ===================================================
-           EXTRACT REAL AGENT RESPONSE
+           REAL AGENT RESPONSE
            =================================================== */
 
-        var reply =
-          extractReply(data);
+        if (
+          reply &&
+          String(reply).trim()
+        ) {
 
-
-        if (reply) {
-
-          /*
-           * REAL response from n8n / AI agent.
-           */
           addMessage(
             'agent',
-            renderText(reply)
+            renderText(
+              reply
+            )
           );
 
         } else {
 
-          /*
-           * Server responded, but format was
-           * not recognized.
-           */
           console.error(
             '[' +
             agentName +
             ' chat] Unrecognized live response:',
-            data
+            {
+              contentType:
+                contentType,
+
+              raw:
+                responseText,
+
+              parsed:
+                data
+            }
           );
+
 
           showFailure(
             text,
-            'Unrecognized response format'
+            'The live agent returned no readable message.'
           );
         }
 
 
-      } catch (error) {
+      } catch (
+        error
+      ) {
 
         /* ===================================================
            REQUEST FAILURE
@@ -922,13 +1245,13 @@
           typingRow &&
           typingRow.parentNode
         ) {
+
           typingRow.remove();
         }
 
 
         /*
          * Show real connection failure.
-         * No simulated response.
          */
         showFailure(
           text,
@@ -941,7 +1264,10 @@
         /*
          * Always unlock UI.
          */
-        setBusy(false);
+        setBusy(
+          false
+        );
+
 
         textarea.focus();
       }
@@ -957,6 +1283,7 @@
       function (event) {
 
         event.preventDefault();
+
 
         sendMessage(
           textarea.value
@@ -980,6 +1307,7 @@
         ) {
 
           event.preventDefault();
+
 
           sendMessage(
             textarea.value
@@ -1032,11 +1360,15 @@
         '[data-agent-chat]'
       );
 
-    if (!panels.length) {
+
+    if (
+      !panels.length
+    ) {
 
       console.warn(
         '[ANTRA-WEB chat] No agent chat panels found.'
       );
+
 
       return;
     }
@@ -1047,9 +1379,13 @@
 
         try {
 
-          initPanel(panel);
+          initPanel(
+            panel
+          );
 
-        } catch (error) {
+        } catch (
+          error
+        ) {
 
           console.error(
             '[ANTRA-WEB chat] Failed to initialize panel:',
@@ -1077,7 +1413,10 @@
       );
 
 
-    if (!els.length) {
+    if (
+      !els.length
+    ) {
+
       return;
     }
 
@@ -1099,12 +1438,14 @@
         }
       );
 
+
       return;
     }
 
 
     var observer =
       new IntersectionObserver(
+
         function (entries) {
 
           entries.forEach(
@@ -1118,6 +1459,7 @@
                   'is-visible'
                 );
 
+
                 observer.unobserve(
                   entry.target
                 );
@@ -1127,7 +1469,8 @@
         },
 
         {
-          threshold: 0.12,
+          threshold:
+            0.12,
 
           rootMargin:
             '0px 0px -8% 0px'
