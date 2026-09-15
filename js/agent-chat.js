@@ -53,10 +53,6 @@
   function renderText(str) {
     var safe = escapeHtml(str).trim();
 
-    /*
-     * Basic markdown-style bold support.
-     * Everything else remains safely escaped.
-     */
     safe = safe.replace(
       /\*\*(.+?)\*\*/g,
       '<strong>$1</strong>'
@@ -70,18 +66,11 @@
 
   /* =========================================================
      RESPONSE EXTRACTION
-     =========================================================
-     n8n / agent responses can arrive in slightly different
-     JSON shapes. Try the common possibilities without ever
-     inventing a response.
      ========================================================= */
 
   function extractReply(data) {
     var d = data;
 
-    /*
-     * Some webhook responses can be arrays.
-     */
     if (Array.isArray(d)) {
       d = d[0];
     }
@@ -90,27 +79,16 @@
       return null;
     }
 
-    /*
-     * Plain text response.
-     */
     if (typeof d === 'string') {
       var plain = d.trim();
 
-      return plain
-        ? d
-        : null;
+      return plain ? d : null;
     }
 
-    /*
-     * Anything else must be an object.
-     */
     if (typeof d !== 'object') {
       return null;
     }
 
-    /*
-     * Common n8n / AI response fields.
-     */
     var keys = [
       'output',
       'text',
@@ -124,9 +102,6 @@
     for (var i = 0; i < keys.length; i++) {
       var value = d[keys[i]];
 
-      /*
-       * Direct string.
-       */
       if (
         typeof value === 'string' &&
         value.trim()
@@ -134,9 +109,6 @@
         return value;
       }
 
-      /*
-       * Nested content object.
-       */
       if (
         value &&
         typeof value === 'object' &&
@@ -147,11 +119,6 @@
       }
     }
 
-    /*
-     * Last-resort search for a useful string field.
-     * This does NOT generate anything; it only uses data
-     * actually returned by the live server.
-     */
     for (var key in d) {
       if (
         Object.prototype.hasOwnProperty.call(d, key) &&
@@ -173,15 +140,15 @@
   function initPanel(panel) {
 
     /*
-     * REAL n8n webhook.
+     * Real n8n webhook.
      * Used only for "OPEN IN NEW TAB".
      */
     var webhook =
       panel.getAttribute('data-webhook');
 
     /*
-     * REAL Cloudflare Worker endpoint.
-     * This is what the browser uses for the embedded chat.
+     * Real Cloudflare Worker endpoint.
+     * Used by embedded browser chat.
      */
     var fetchTarget =
       panel.getAttribute('data-proxy');
@@ -275,11 +242,6 @@
       }
 
     } catch (e) {
-
-      /*
-       * If sessionStorage is unavailable,
-       * still create a temporary session.
-       */
       sessionId = uid();
 
       console.warn(
@@ -309,10 +271,6 @@
       );
     }
 
-
-    /*
-     * Wire existing "OPEN IN NEW TAB" buttons.
-     */
     for (
       var i = 0;
       i < openLiveBtns.length;
@@ -359,10 +317,6 @@
       row.className =
         'msg msg-' + role;
 
-
-      /*
-       * Agent avatar.
-       */
       if (role === 'agent') {
 
         var avatar =
@@ -379,10 +333,6 @@
         row.appendChild(avatar);
       }
 
-
-      /*
-       * Message bubble.
-       */
       var bubble =
         document.createElement('div');
 
@@ -414,7 +364,6 @@
       row.className =
         'msg msg-agent msg-typing';
 
-
       var avatar =
         document.createElement('div');
 
@@ -427,7 +376,6 @@
           .toUpperCase();
 
       row.appendChild(avatar);
-
 
       var bubble =
         document.createElement('div');
@@ -489,7 +437,6 @@
         ) + 'px';
     }
 
-
     textarea.addEventListener(
       'input',
       autoGrow
@@ -500,16 +447,15 @@
        FAILURE MESSAGE
        ======================================================= */
 
-    function showFailure(originalText, errorDetails) {
+    function showFailure(
+      originalText,
+      errorDetails
+    ) {
 
-      /*
-       * Do not fake a reply.
-       * Tell the user the live connection failed.
-       */
       addMessage(
         'system',
 
-        'Couldn\u2019t reach the live ' +
+        'Couldn’t reach the live ' +
         escapeHtml(agentName) +
         ' connection.' +
 
@@ -528,17 +474,12 @@
         'data-chat-open-live>' +
         'Continue with ' +
         escapeHtml(agentName) +
-        ' \u2192' +
+        ' →' +
         '</button>' +
 
         '</div>'
       );
 
-
-      /*
-       * Log useful debugging information.
-       * Nothing sensitive is displayed to the visitor.
-       */
       console.error(
         '[' +
         agentName +
@@ -565,7 +506,6 @@
         ];
 
       if (retry) {
-
         retry.addEventListener(
           'click',
           function () {
@@ -592,7 +532,6 @@
         ];
 
       if (openButton) {
-
         openButton.addEventListener(
           'click',
           openLive
@@ -610,11 +549,6 @@
       var text =
         (rawText || '').trim();
 
-
-      /*
-       * Do nothing for empty messages
-       * or while another request is running.
-       */
       if (
         !text ||
         busy
@@ -634,24 +568,12 @@
         renderText(text)
       );
 
-
-      /*
-       * Clear input.
-       */
       textarea.value = '';
 
       autoGrow();
 
-
-      /*
-       * Lock UI.
-       */
       setBusy(true);
 
-
-      /*
-       * Show typing indicator.
-       */
       var typingRow =
         addTyping();
 
@@ -679,11 +601,11 @@
              ↓
            n8n
 
-           The browser sends text/plain intentionally.
+           Browser sends text/plain intentionally.
            This avoids a CORS preflight request.
 
-           The Cloudflare Worker receives the raw JSON text
-           and forwards it to n8n as application/json.
+           Worker receives the raw JSON text and forwards
+           it to n8n as application/json.
            =================================================== */
 
         var response =
@@ -706,10 +628,6 @@
               credentials:
                 'omit',
 
-              /*
-               * Do not let an accidental redirect silently
-               * change the destination.
-               */
               redirect:
                 'follow'
             }
@@ -737,7 +655,8 @@
             response.status +
             (
               errorBody
-                ? ' — ' + errorBody.slice(0, 500)
+                ? ' — ' +
+                  errorBody.slice(0, 500)
                 : ''
             )
           );
@@ -745,7 +664,7 @@
 
 
         /* ===================================================
-           READ RESPONSE
+           READ RESPONSE — FIXED
            =================================================== */
 
         var contentType =
@@ -753,12 +672,29 @@
             'content-type'
           ) || '';
 
-        var data;
-
-
         /*
-         * JSON response.
+         * IMPORTANT:
+         * Do NOT use response.json() here.
+         *
+         * The browser console showed:
+         *
+         * SyntaxError:
+         * Unexpected whitespace character
+         * after JSON
+         *
+         * So we read the response as text first.
          */
+        var responseText =
+          await response.text();
+
+        var data =
+          responseText;
+
+
+        /* ===================================================
+           PARSE JSON SAFELY
+           =================================================== */
+
         if (
           contentType
             .toLowerCase()
@@ -767,17 +703,151 @@
             ) !== -1
         ) {
 
-          data =
-            await response.json();
+          try {
 
-        } else {
+            /*
+             * Normal JSON response.
+             */
+            data =
+              JSON.parse(
+                responseText
+              );
 
-          /*
-           * Some webhook configurations may return
-           * plain text.
-           */
-          data =
-            await response.text();
+          } catch (jsonError) {
+
+            /*
+             * Some n8n configurations can return
+             * multiple JSON objects separated by
+             * whitespace/newlines.
+             */
+            var lines =
+              responseText
+                .split(/\r?\n/)
+                .map(
+                  function (line) {
+                    return line.trim();
+                  }
+                )
+                .filter(Boolean);
+
+            var parsedItems = [];
+
+
+            /* ===============================================
+               PARSE EACH JSON LINE
+               =============================================== */
+
+            for (
+              var li = 0;
+              li < lines.length;
+              li++
+            ) {
+
+              var candidate =
+                lines[li];
+
+
+              /*
+               * Support SSE-style:
+               *
+               * data: {...}
+               */
+              if (
+                candidate.indexOf(
+                  'data:'
+                ) === 0
+              ) {
+
+                candidate =
+                  candidate
+                    .slice(5)
+                    .trim();
+              }
+
+
+              try {
+
+                parsedItems.push(
+                  JSON.parse(
+                    candidate
+                  )
+                );
+
+              } catch (lineError) {
+
+                /*
+                 * Ignore non-JSON lines.
+                 */
+              }
+            }
+
+
+            /* ===============================================
+               ONE VALID JSON OBJECT
+               =============================================== */
+
+            if (
+              parsedItems.length === 1
+            ) {
+
+              data =
+                parsedItems[0];
+
+            }
+
+
+            /* ===============================================
+               MULTIPLE VALID JSON OBJECTS
+               =============================================== */
+
+            else if (
+              parsedItems.length > 1
+            ) {
+
+              var foundReply =
+                false;
+
+
+              /*
+               * Look for the object that actually
+               * contains the agent response.
+               */
+              for (
+                var pi = 0;
+                pi < parsedItems.length;
+                pi++
+              ) {
+
+                if (
+                  extractReply(
+                    parsedItems[pi]
+                  )
+                ) {
+
+                  data =
+                    parsedItems[pi];
+
+                  foundReply =
+                    true;
+
+                  break;
+                }
+              }
+
+
+              /*
+               * If none contains a recognized reply,
+               * use the final parsed object.
+               */
+              if (!foundReply) {
+
+                data =
+                  parsedItems[
+                    parsedItems.length - 1
+                  ];
+              }
+            }
+          }
         }
 
 
@@ -814,8 +884,8 @@
         } else {
 
           /*
-           * Server responded, but the format wasn't one
-           * we recognize. Do NOT fake a reply.
+           * Server responded, but format was
+           * not recognized.
            */
           console.error(
             '[' +
@@ -994,7 +1064,7 @@
   /* =========================================================
      SCROLL REVEAL
      ---------------------------------------------------------
-     IMPORTANT FIX:
+     IMPORTANT:
      .reveal-up elements start hidden in CSS.
      This adds .is-visible when they enter the viewport.
      ========================================================= */
