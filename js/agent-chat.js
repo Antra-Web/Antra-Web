@@ -1,26 +1,19 @@
+/* ANTRA-WEB — LIVE AGENT CHAT ENGINE */
+
 (function () {
   'use strict';
 
-  /*
-   * ANTRA-WEB — LIVE AGENT CHAT ENGINE
-   *
-   * Browser flow:
-   * Portfolio → Cloudflare Worker → real n8n Chat Trigger → real agent
-   *
-   * data-webhook = REAL n8n URL
-   * data-proxy   = Cloudflare Worker URL used by embedded chat
-   *
-   * IMPORTANT:
-   * Embedded chat NEVER calls n8n directly.
-   * It ALWAYS uses data-proxy.
-   */
-
   function uid() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    if (
+      window.crypto &&
+      typeof window.crypto.randomUUID === 'function'
+    ) {
       return window.crypto.randomUUID();
     }
 
-    return 'sess-' + Date.now() + '-' +
+    return 'sess-' +
+      Date.now() +
+      '-' +
       Math.random().toString(16).slice(2);
   }
 
@@ -44,9 +37,6 @@
     return safe;
   }
 
-  /*
-   * Extract a usable reply from common n8n response formats.
-   */
   function extractReply(data) {
     var d = data;
 
@@ -77,45 +67,7 @@
     ];
 
     for (var i = 0; i < keys.length; i++) {
-      var v = d[keys[i]];
-
-      if (typeof v === 'string' && v.trim()) {
-        return v;
-      }
-
-      if (v && typeof v === 'object') {
-        if (
-          typeof v.content === 'string' &&
-          v.content.trim()
-        ) {
-          return v.content;
-        }
-
-        if (
-          typeof v.text === 'string' &&
-          v.text.trim()
-        ) {
-          return v.text;
-        }
-
-        if (
-          typeof v.output === 'string' &&
-          v.output.trim()
-        ) {
-          return v.output;
-        }
-      }
-    }
-
-    /*
-     * Support nested response objects.
-     */
-    for (var k in d) {
-      if (!Object.prototype.hasOwnProperty.call(d, k)) {
-        continue;
-      }
-
-      var value = d[k];
+      var value = d[keys[i]];
 
       if (
         typeof value === 'string' &&
@@ -126,13 +78,21 @@
 
       if (
         value &&
-        typeof value === 'object'
+        typeof value === 'object' &&
+        typeof value.content === 'string' &&
+        value.content.trim()
       ) {
-        var nested = extractReply(value);
+        return value.content;
+      }
+    }
 
-        if (nested) {
-          return nested;
-        }
+    for (var key in d) {
+      if (
+        Object.prototype.hasOwnProperty.call(d, key) &&
+        typeof d[key] === 'string' &&
+        d[key].trim()
+      ) {
+        return d[key];
       }
     }
 
@@ -140,28 +100,15 @@
   }
 
   function initPanel(panel) {
+    var webhook =
+      panel.getAttribute('data-webhook');
 
-    /*
-     * REAL n8n webhook.
-     * Used ONLY for the "Continue with Ava/Flow" button.
-     */
-    var webhook = panel.getAttribute('data-webhook');
-
-    /*
-     * Cloudflare Worker.
-     * THIS is the endpoint used by the embedded chat.
-     */
-    var proxy = panel.getAttribute('data-proxy');
+    var fetchTarget =
+      panel.getAttribute('data-proxy');
 
     var agentName =
-      panel.getAttribute('data-agent-name') || 'Agent';
-
-    /*
-     * DO NOT FALL BACK TO THE N8N WEBHOOK.
-     *
-     * Browser → Worker is the intended architecture.
-     */
-    var fetchTarget = proxy;
+      panel.getAttribute('data-agent-name') ||
+      'Agent';
 
     var storageKey =
       'antra-chat-session-' +
@@ -192,33 +139,26 @@
         '[data-chat-chip]'
       );
 
-    if (!webhook || !body || !form || !textarea) {
+    if (
+      !webhook ||
+      !fetchTarget ||
+      !body ||
+      !form ||
+      !textarea
+    ) {
       console.error(
-        '[' + agentName +
-        ' chat] Required chat elements are missing.'
+        '[' + agentName + ' chat] Missing required configuration.'
       );
-
       return;
     }
 
-    /*
-     * Make missing proxy configuration obvious.
-     */
-    if (!fetchTarget) {
-      console.error(
-        '[' + agentName +
-        ' chat] ERROR: data-proxy is missing.'
-      );
-    }
-
-    /*
-     * Persistent conversation session.
-     */
     var sessionId;
 
     try {
       sessionId =
-        window.sessionStorage.getItem(storageKey);
+        window.sessionStorage.getItem(
+          storageKey
+        );
 
       if (!sessionId) {
         sessionId = uid();
@@ -228,22 +168,13 @@
           sessionId
         );
       }
-
     } catch (e) {
       sessionId = uid();
     }
 
     var busy = false;
 
-    /*
-     * Open the REAL n8n hosted chat.
-     */
     function openLive() {
-
-      if (!webhook) {
-        return;
-      }
-
       window.open(
         webhook,
         '_blank',
@@ -263,30 +194,25 @@
     }
 
     function scrollToEnd() {
-      body.scrollTop = body.scrollHeight;
+      body.scrollTop =
+        body.scrollHeight;
     }
 
     function hideEmpty() {
       if (emptyState) {
-        emptyState.style.display = 'none';
+        emptyState.style.display =
+          'none';
       }
     }
 
     function addMessage(role, html) {
-
       var row =
         document.createElement('div');
 
       row.className =
         'msg msg-' + role;
 
-      row.setAttribute(
-        'data-reveal',
-        ''
-      );
-
       if (role === 'agent') {
-
         var avatar =
           document.createElement('div');
 
@@ -319,17 +245,11 @@
     }
 
     function addTyping() {
-
       var row =
         document.createElement('div');
 
       row.className =
         'msg msg-agent msg-typing';
-
-      row.setAttribute(
-        'data-typing',
-        ''
-      );
 
       var avatar =
         document.createElement('div');
@@ -351,9 +271,7 @@
         'msg-bubble typing-indicator';
 
       bubble.innerHTML =
-        '<span></span>' +
-        '<span></span>' +
-        '<span></span>';
+        '<span></span><span></span><span></span>';
 
       row.appendChild(bubble);
 
@@ -365,7 +283,6 @@
     }
 
     function setBusy(state) {
-
       busy = state;
 
       textarea.disabled = state;
@@ -381,7 +298,6 @@
     }
 
     function autoGrow() {
-
       textarea.style.height = 'auto';
 
       textarea.style.height =
@@ -396,153 +312,66 @@
       autoGrow
     );
 
-    /*
-     * Detailed browser diagnostics.
-     */
-    function logFailure(
-      stage,
-      err,
-      res
-    ) {
+    function showFailure(originalText) {
+      addMessage(
+        'system',
+        'Couldn\u2019t reach the live ' +
+        escapeHtml(agentName) +
+        ' connection.' +
 
-      var label =
-        '[' +
-        agentName +
-        ' chat] ' +
-        stage;
+        '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">' +
 
-      if (res) {
+        '<button type="button" class="chip-link" data-chat-retry>' +
+        'Try again' +
+        '</button>' +
 
-        console.error(
-          label +
-          ' — HTTP ' +
-          res.status +
-          ' from ' +
-          fetchTarget
-        );
+        '<button type="button" class="chip-link" data-chat-open-live>' +
+        'Continue with ' +
+        escapeHtml(agentName) +
+        ' \u2192' +
+        '</button>' +
 
-      } else if (
-        err &&
-        err.name === 'AbortError'
-      ) {
+        '</div>'
+      );
 
-        console.error(
-          label +
-          ' — request timed out after 20 seconds.'
-        );
-
-      } else {
-
-        console.error(
-          label +
-          ' — browser could not complete request.' +
-          ' Target: ' +
-          fetchTarget +
-          ' Error: ' +
-          (
-            err &&
-            err.message
-              ? err.message
-              : err
-          ),
-          err
-        );
-      }
-    }
-
-    function wireLastRetry(
-      originalText
-    ) {
-
-      var btns =
+      var retryButtons =
         body.querySelectorAll(
           '[data-chat-retry]'
         );
 
-      var last =
-        btns[btns.length - 1];
+      var retry =
+        retryButtons[
+          retryButtons.length - 1
+        ];
 
-      if (last) {
-
-        last.addEventListener(
+      if (retry) {
+        retry.addEventListener(
           'click',
           function () {
             sendMessage(originalText);
           }
         );
       }
-    }
 
-    function wireLastOpenLive() {
-
-      var btns =
+      var openButtons =
         body.querySelectorAll(
           '[data-chat-open-live]'
         );
 
-      var last =
-        btns[btns.length - 1];
+      var openButton =
+        openButtons[
+          openButtons.length - 1
+        ];
 
-      if (last) {
-        last.addEventListener(
+      if (openButton) {
+        openButton.addEventListener(
           'click',
           openLive
         );
       }
     }
 
-    function showFailure(
-      originalText,
-      title,
-      detail
-    ) {
-
-      addMessage(
-        'system',
-
-        '<strong>' +
-        escapeHtml(title) +
-        '</strong>' +
-
-        '<div style="margin-top:6px;">' +
-        escapeHtml(detail) +
-        '</div>' +
-
-        '<div style="' +
-        'margin-top:12px;' +
-        'display:flex;' +
-        'gap:10px;' +
-        'flex-wrap:wrap;' +
-        '">' +
-
-        '<button ' +
-        'type="button" ' +
-        'class="chip-link" ' +
-        'data-chat-retry>' +
-        'Try again' +
-        '</button>' +
-
-        '<button ' +
-        'type="button" ' +
-        'class="chip-link" ' +
-        'data-chat-open-live>' +
-        'Continue with ' +
-        escapeHtml(agentName) +
-        ' →' +
-        '</button>' +
-
-        '</div>'
-      );
-
-      wireLastOpenLive();
-
-      wireLastRetry(
-        originalText
-      );
-    }
-
-    function sendMessage(rawText) {
-
+    async function sendMessage(rawText) {
       var text =
         (rawText || '').trim();
 
@@ -566,296 +395,117 @@
       var typingRow =
         addTyping();
 
-      /*
-       * NEVER send directly to n8n.
-       */
-      if (!fetchTarget) {
+      var payload =
+        JSON.stringify({
+          action: 'sendMessage',
+          sessionId: sessionId,
+          chatInput: text
+        });
 
-        if (typingRow.parentNode) {
-          typingRow.remove();
-        }
+      try {
+        /*
+         * IMPORTANT:
+         *
+         * We intentionally send text/plain from the browser.
+         * This avoids the browser's CORS preflight.
+         *
+         * The Cloudflare Worker receives this exact JSON text
+         * and forwards it to n8n as application/json.
+         */
+        var response =
+          await fetch(fetchTarget, {
+            method: 'POST',
 
-        showFailure(
-          text,
-          'Embedded chat is not connected yet.',
-          'The Cloudflare proxy address is missing from this agent panel.'
-        );
+            headers: {
+              'Content-Type':
+                'text/plain;charset=UTF-8',
+              'Accept':
+                'application/json, text/plain, */*'
+            },
 
-        setBusy(false);
+            body: payload,
 
-        textarea.focus();
+            credentials: 'omit'
+          });
 
-        return;
-      }
-
-      var controller =
-        ('AbortController' in window)
-          ? new AbortController()
-          : null;
-
-      var timeoutId =
-        controller
-          ? setTimeout(
-              function () {
-                controller.abort();
-              },
-              20000
-            )
-          : null;
-
-      /*
-       * REAL request:
-       *
-       * Portfolio
-       *     ↓
-       * Cloudflare Worker
-       *     ↓
-       * n8n Chat Trigger
-       *     ↓
-       * AI Agent
-       */
-      fetch(
-        fetchTarget,
-        {
-          method: 'POST',
-
-          mode: 'cors',
-
-          cache: 'no-store',
-
-          headers: {
-            'Content-Type':
-              'application/json',
-
-            'Accept':
-              'application/json, text/plain, */*'
-          },
-
-          body: JSON.stringify({
-            action: 'sendMessage',
-            sessionId: sessionId,
-            chatInput: text
-          }),
-
-          signal:
-            controller
-              ? controller.signal
-              : undefined
-        }
-      )
-
-      .then(function (res) {
-
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-
-        if (!res.ok) {
-
-          logFailure(
-            'HTTP error',
-            null,
-            res
+        if (!response.ok) {
+          throw new Error(
+            'HTTP ' +
+            response.status
           );
-
-          return res
-            .text()
-            .catch(function () {
-              return '';
-            })
-            .then(function (bodyText) {
-
-              var err =
-                new Error(
-                  'HTTP ' +
-                  res.status
-                );
-
-              err.serverBody =
-                bodyText;
-
-              err.httpStatus =
-                res.status;
-
-              throw err;
-            });
         }
 
         var contentType =
-          res.headers.get(
+          response.headers.get(
             'content-type'
           ) || '';
 
+        var data;
+
         if (
-          contentType
-            .toLowerCase()
-            .indexOf(
-              'application/json'
-            ) !== -1
+          contentType.indexOf(
+            'application/json'
+          ) !== -1
         ) {
-
-          return res.json();
-
+          data =
+            await response.json();
         } else {
-
-          return res.text();
+          data =
+            await response.text();
         }
-      })
-
-      .then(function (data) {
 
         if (typingRow.parentNode) {
           typingRow.remove();
         }
-
-        console.log(
-          '[' +
-          agentName +
-          ' chat] live response:',
-          data
-        );
 
         var reply =
           extractReply(data);
 
         if (reply) {
-
           addMessage(
             'agent',
             renderText(reply)
           );
+        } else {
+          console.error(
+            '[' +
+            agentName +
+            ' chat] Unrecognized response:',
+            data
+          );
 
-          return;
+          showFailure(text);
         }
 
-        /*
-         * Server responded successfully,
-         * but reply format was unexpected.
-         */
+      } catch (error) {
+
         console.error(
           '[' +
           agentName +
-          ' chat] response shape not recognized:',
-          data
+          ' chat] Request failed:',
+          error
         );
 
-        showFailure(
-          text,
-
-          'The live agent responded, but the reply format was unexpected.',
-
-          'Nothing was simulated. Check the browser console for the exact live response.'
-        );
-      })
-
-      .catch(function (err) {
-
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-
-        if (typingRow.parentNode) {
+        if (
+          typingRow.parentNode
+        ) {
           typingRow.remove();
         }
 
-        var status =
-          err &&
-          err.httpStatus;
+        showFailure(text);
 
-        if (!status) {
-
-          logFailure(
-            'request failed',
-            err,
-            null
-          );
-        }
-
-        var detail;
-
-        if (
-          err &&
-          err.name === 'AbortError'
-        ) {
-
-          detail =
-            'The live connection took longer than 20 seconds. Check the Cloudflare Worker and n8n execution.';
-
-        } else if (
-          status === 404
-        ) {
-
-          detail =
-            'The Cloudflare proxy route was not found. Ava must use /ava and Flow must use /flow.';
-
-        } else if (
-          status === 405
-        ) {
-
-          detail =
-            'The Cloudflare Worker rejected the request method. The Worker must allow POST and OPTIONS.';
-
-        } else if (
-          status === 401 ||
-          status === 403
-        ) {
-
-          detail =
-            'The live connection was rejected with HTTP ' +
-            status +
-            '. Check the Worker configuration.';
-
-        } else if (
-          status === 500 ||
-          status === 502 ||
-          status === 503
-        ) {
-
-          detail =
-            'The proxy or real n8n agent returned a server error. Check Cloudflare Worker logs and the n8n execution.';
-
-        } else if (status) {
-
-          detail =
-            'The live proxy returned HTTP ' +
-            status +
-            '. Check the browser console for the exact response.';
-
-        } else {
-
-          detail =
-            'The browser could not complete the request to the Cloudflare proxy. Check the Network tab for the request to ' +
-            fetchTarget +
-            '.';
-        }
-
-        showFailure(
-          text,
-
-          'Couldn’t reach the live ' +
-          agentName +
-          ' connection.',
-
-          detail
-        );
-      })
-
-      .finally(function () {
+      } finally {
 
         setBusy(false);
 
         textarea.focus();
-      });
+      }
     }
 
-    /*
-     * Form submit.
-     */
     form.addEventListener(
       'submit',
-      function (e) {
-
-        e.preventDefault();
+      function (event) {
+        event.preventDefault();
 
         sendMessage(
           textarea.value
@@ -863,20 +513,14 @@
       }
     );
 
-    /*
-     * Enter sends.
-     * Shift + Enter creates a new line.
-     */
     textarea.addEventListener(
       'keydown',
-      function (e) {
-
+      function (event) {
         if (
-          e.key === 'Enter' &&
-          !e.shiftKey
+          event.key === 'Enter' &&
+          !event.shiftKey
         ) {
-
-          e.preventDefault();
+          event.preventDefault();
 
           sendMessage(
             textarea.value
@@ -885,19 +529,14 @@
       }
     );
 
-    /*
-     * Suggested prompt chips.
-     */
     for (
       var c = 0;
       c < chips.length;
       c++
     ) {
-
       chips[c].addEventListener(
         'click',
         function () {
-
           sendMessage(
             this.getAttribute(
               'data-chat-chip'
@@ -909,7 +548,6 @@
   }
 
   function initAll() {
-
     var panels =
       document.querySelectorAll(
         '[data-agent-chat]'
@@ -924,98 +562,12 @@
     document.readyState ===
     'loading'
   ) {
-
     document.addEventListener(
       'DOMContentLoaded',
       initAll
     );
-
   } else {
-
     initAll();
-  }
-
-  /*
-   * Lightweight scroll reveal.
-   */
-  function initScrollReveal() {
-
-    var els =
-      document.querySelectorAll(
-        '.reveal-up'
-      );
-
-    if (!els.length) {
-      return;
-    }
-
-    if (
-      typeof IntersectionObserver ===
-      'undefined'
-    ) {
-
-      els.forEach(
-        function (el) {
-          el.classList.add(
-            'is-visible'
-          );
-        }
-      );
-
-      return;
-    }
-
-    var observer =
-      new IntersectionObserver(
-
-        function (entries) {
-
-          entries.forEach(
-            function (entry) {
-
-              if (
-                entry.isIntersecting
-              ) {
-
-                entry.target.classList.add(
-                  'is-visible'
-                );
-
-                observer.unobserve(
-                  entry.target
-                );
-              }
-            }
-          );
-        },
-
-        {
-          threshold: 0.12,
-          rootMargin:
-            '0px 0px -8% 0px'
-        }
-      );
-
-    els.forEach(
-      function (el) {
-        observer.observe(el);
-      }
-    );
-  }
-
-  if (
-    document.readyState ===
-    'loading'
-  ) {
-
-    document.addEventListener(
-      'DOMContentLoaded',
-      initScrollReveal
-    );
-
-  } else {
-
-    initScrollReveal();
   }
 
 })();
