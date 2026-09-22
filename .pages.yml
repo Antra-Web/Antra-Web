@@ -1,0 +1,265 @@
+media:
+  input: assets
+  output: /assets
+  rename: safe
+
+content:
+
+  - name: site_settings
+    label: Site Settings
+    type: file
+    path: data/site.json
+    format: json
+    fields:
+      - name: site_name
+        label: Site Name
+        type: string
+        required: true
+
+      - name: tagline
+        label: Tagline
+        type: text
+
+      - name: email
+        label: Email
+        type: string
+
+      - name: phone
+        label: Phone
+        type: string
+
+      - name: whatsapp
+        label: WhatsApp
+        type: string
+
+      - name: location
+        label: Location
+        type: string
+
+      - name: logo
+        label: Logo
+        type: image
+
+      - name: hero_image
+        label: Hero Image
+        type: image
+
+  - name: services
+    label: Services
+    type: file
+    path: data/services.json
+    format: json
+    list: true
+    fields:
+      - name: title
+        label: Service Name
+        type: string
+        required: true
+
+      - name: description
+        label: Description
+        type: text
+
+      - name: price
+        label: Starting Price
+        type: string
+
+      - name: image
+        label: Image
+        type: image
+
+      - name: enabled
+        label: Show on Website
+        type: boolean
+
+  - name: packages
+    label: Packages & Pricing
+    type: file
+    path: data/packages.json
+    format: json
+    list: true
+    fields:
+      - name: name
+        label: Package Name
+        type: string
+        required: true
+
+      - name: target
+        label: Best For
+        type: string
+
+      - name: price
+        label: Price
+        type: string
+
+      - name: billing
+        label: Billing
+        type: string
+
+      - name: description
+        label: Description
+        type: text
+
+      - name: features
+        label: Features
+        type: string
+        list: true
+
+      - name: featured
+        label: Featured Package
+        type: boolean
+
+      - name: enabled
+        label: Show on Website
+        type: boolean
+
+  - name: portfolio
+    label: Portfolio Projects
+    type: file
+    path: data/portfolio.json
+    format: json
+    list: true
+    fields:
+      - name: title
+        label: Project Name
+        type: string
+        required: true
+
+      - name: category
+        label: Category
+        type: string
+
+      - name: description
+        label: Description
+        type: text
+
+      - name: image
+        label: Project Image
+        type: image
+
+      - name: project_url
+        label: Project URL
+        type: string
+
+      - name: enabled
+        label: Show on Website
+        type: boolean
+
+  - name: testimonials
+    label: Testimonials
+    type: file
+    path: data/testimonials.json
+    format: json
+    list: true
+    fields:
+      - name: name
+        label: Client Name
+        type: string
+
+      - name: company
+        label: Company
+        type: string
+
+      - name: quote
+        label: Testimonial
+        type: text
+
+      - name: image
+        label: Client Image
+        type: image
+
+      - name: enabled
+        label: Show on Website
+        type: boolean
+
+  - name: faqs
+    label: FAQs
+    type: file
+    path: data/faqs.json
+    format: json
+    list: true
+    fields:
+      - name: question
+        label: Question
+        type: string
+        required: true
+
+      - name: answer
+        label: Answer
+        type: rich-text
+
+      - name: enabled
+        label: Show on Website
+        type: boolean
+
+  - name: contact
+    label: Contact Information
+    type: file
+    path: data/contact.json
+    format: json
+    fields:
+      - name: email
+        label: Email
+        type: string
+
+      - name: whatsapp
+        label: WhatsApp
+        type: string
+
+      - name: instagram
+        label: Instagram
+        type: string
+
+      - name: facebook
+        label: Facebook
+        type: string
+
+      - name: twitter
+        label: X / Twitter
+        type: string
+
+      - name: linkedin
+        label: LinkedIn
+        type: string
+
+      - name: slack
+        label: Slack
+        type: string
+
+  - name: homepage
+    label: Homepage Content
+    type: file
+    path: data/homepage.json
+    format: json
+    fields:
+      - name: eyebrow
+        label: Eyebrow
+        type: string
+
+      - name: headline
+        label: Main Headline
+        type: string
+
+      - name: subheadline
+        label: Subheadline
+        type: text
+
+      - name: primary_button
+        label: Primary Button
+        type: string
+
+      - name: primary_button_url
+        label: Primary Button URL
+        type: string
+
+      - name: secondary_button
+        label: Secondary Button
+        type: string
+
+      - name: secondary_button_url
+        label: Secondary Button URL
+        type: string
+
+      - name: hero_image
+        label: Hero Image
+        type: image
